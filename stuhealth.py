@@ -1,8 +1,8 @@
-from time import strftime,localtime
+from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import algorithms
 from Crypto.Cipher import AES
-from random import randint
+from random import choice
 from base64 import b64encode
 import requests
 from json import loads
@@ -37,27 +37,36 @@ def clean(tb,l):
 def mail(rec,msg):
     message = MIMEText(msg,'plain','utf-8')
     message['Subject'] = 'Stuhealth'
-    message['From'] = formataddr(['Script','发件人邮箱'])
+    message['From'] = formataddr(['Script','lakwsh@lakwsh.net'])
     try:
-        smtp = SMTP_SSL()
-        smtp.connect('邮箱服务器',465)
-        smtp.login('邮箱登录名','邮箱登录密码')
-        smtp.sendmail('发件人邮箱',rec,message.as_string())
+        smtp = SMTP_SSL('smtp.exmail.qq.com')
+        smtp.connect('smtp.exmail.qq.com',465)
+        smtp.login('lakwsh@lakwsh.net','邮箱密码')
+        smtp.sendmail('lakwsh@lakwsh.net',rec,message.as_string())
         smtp.quit()
     except Exception as e:
         print(msg)
         print(str(e))
         exit(1)
+def getvalidate():
+    res = requests.get('过滑块验证码api')
+    if res.status_code == requests.codes.ok:
+        return res.text
+    raise RuntimeError('Get-Failed: ' + str(res.status_code))
 
-ul = {'学号1':'密码1','学号2':'密码2',...}
-result = strftime('%Y-%m-%d %H:%M:%S',localtime())
+ul = {'2019000000':'密码'}
+result = str(datetime.now())
 try:
     for usr,pwd in ul.items():
-        ret = req('https://stuhealth.jnu.edu.cn/api/user/login',{'username':usr,'password':encrypt(pwd).replace('=','*',1)})
+        try:
+            validate = getvalidate()
+        except:
+            validate = getvalidate()
+        ret = req('https://stuhealth.jnu.edu.cn/api/user/login',{'username':usr,'password':encrypt(pwd).replace('=','*',1),'validate':validate})
         meta = ret['meta']
-        jid = ret['data']['jnuid']
         result += '\n' + usr + ' => ' + meta['msg']
         if meta['code'] == 200:
+            jid = ret['data']['jnuid']
             ret = req('https://stuhealth.jnu.edu.cn/api/user/stuinfo',{'jnuid':jid,'idType':ret['data']['idtype']})
             data = ret['data']
             mt = clean(data['mainTable'],['id','personType','createTime','del'])
@@ -66,10 +75,14 @@ try:
             mt['professionName'] = data['zy']
             mt['collegeName'] = data['yxsmc']
             mt['declareTime'] = data['declare_time']
-            mt['temperature'] = '36.' + str(randint(1,7))
-            ret = req('https://stuhealth.jnu.edu.cn/api/write/main',{'mainTable':mt,'secondTable':clean(data['secondTable'],['id','mainId']),'jnuid':jid})
+            st = clean(data['secondTable'],['id','mainId'])
+            st['other29'] = '35.' + choice('45678')
+            st['other31'] = '36.' + choice('12345')
+            st['other33'] = '35.' + choice('56789')
+            st['other30'] = st['other32'] = st['other34'] = str(datetime.today()+timedelta(days = -1))
+            ret = req('https://stuhealth.jnu.edu.cn/api/write/main',{'mainTable':mt,'secondTable':st,'jnuid':jid})
             result += '\n' + ret['meta']['msg']
             result += '\nTime => ' + ret['meta']['timestamp']
-    mail(['打卡成功邮箱'],result)
+    mail(['someone@lakwsh.net'],result)
 except Exception as e:
-    mail(['脚本错误邮箱'],result + '\nLine-' + str(e.__traceback__.tb_lineno) + ': ' + str(e))
+    mail(['error@lakwsh.net'],result + '\nLine-' + str(e.__traceback__.tb_lineno) + ': ' + str(e))
