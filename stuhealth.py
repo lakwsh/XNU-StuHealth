@@ -25,11 +25,14 @@ def req(u,d):
 		'Referer': 'https://stuhealth.jnu.edu.cn/'
 	}
 	for _ in range(3):
-		res = requests.post(u,json = d,headers = h)
-		res.encoding = 'utf8'
-		if res.status_code == requests.codes.ok:
-			return loads(res.text)
-		sleep(1)
+		try:
+			res = requests.post(u,json = d,headers = h)
+			res.encoding = 'utf8'
+			if res.status_code == requests.codes.ok:
+				return loads(res.text)
+			sleep(3)
+		except:
+			continue
 	raise RuntimeError('Req-Error: ' + str(res.status_code) + '\nText: ' + res.text)
 def clean(tb,l):
 	if not tb:
@@ -63,8 +66,13 @@ ul = {'学号1':'密码1','学号2':'密码2'}
 result = str(datetime.now())
 try:
 	for usr,pwd in ul.items():
-		validate = getvalidate()
-		ret = req('https://stuhealth.jnu.edu.cn/api/user/login',{'username':usr,'password':encrypt(pwd).replace('=','*',1),'validate':validate})
+		for _ in range(2):
+			try:
+				validate = getvalidate()
+				ret = req('https://stuhealth.jnu.edu.cn/api/user/login',{'username':usr,'password':encrypt(pwd).replace('=','*',1),'validate':validate})
+				break
+			except:
+				continue
 		meta = ret['meta']
 		result += '\n' + usr + ' => ' + meta['msg']
 		if meta['code'] == 200:
@@ -86,7 +94,7 @@ try:
 			ret = req('https://stuhealth.jnu.edu.cn/api/write/main',{'mainTable':mt,'secondTable':st,'jnuid':jid})
 			result += '\n' + ret['meta']['msg']
 			result += '\nTime => ' + ret['meta']['timestamp']
-		sleep(2)
+		sleep(5)
 	mail(['打卡成功邮箱'],result)
 except Exception as e:
 	mail(['打卡错误邮箱'],result + '\nLine-' + str(e.__traceback__.tb_lineno) + ': ' + str(e))
